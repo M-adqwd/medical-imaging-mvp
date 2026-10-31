@@ -1,0 +1,27 @@
+{
+  "Name": "MIIS-Orthanc",
+  "DicomAet": "MIIS",
+  "DicomPort": 4242,
+  "HttpServerEnabled": true,
+  "HttpServerPort": 8042,
+  "HttpServerThreads": 4,
+  "HttpCompression": 0,
+  "AccessControlEnabled": false,
+  "PluginsDirectory": "/usr/lib/orthanc/plugins",
+  "LuaScriptsDirectory": "/usr/share/orthanc/plugins",
+  "StorageDirectory": "/var/lib/orthanc/storage",
+  "IndexDirectory": "/var/lib/orthanc/db",
+  "RemoteAccessAllowed": false,
+  "DcmtkHttpAlwaysVerifyModality": false,
+  "DicomModalities": {
+    "Study": {
+      "Examine": true,
+      "Retrieve": true,
+      "Store": true,
+      "Find": true,
+      "Get": true,
+      "Move": true,
+      "ModalitiesInStudy": ["SEG", "SR"]
+    }
+  }
+}

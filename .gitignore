@@ -1,0 +1,40 @@
+# 运行时数据：虚拟环境、DICOM 存储、数据库、日志（本地生成，不入库）
+server/.venv/
+server/data/
+server/.dicomstore/
+server/*.db
+server/*.db-*
+server/.pytest_cache/
+__pycache__/
+*.pyc
+
+# 前端
+web/node_modules/
+web/dist/
+
+# 本地浏览器调试档案与上传暂存
+.cdp-profile*/
+.uploads/
+.workbuddy/
+logs/
+
+# 密钥与配置
+.env
+.env.*
+!.env.example
+deploy/.env
+*.pem
+*.key
+
+# 部署包产物（由 scripts/build-deploy.mjs 生成）
+deploy/app/
+deploy/dist/
+deploy/data/
+deploy/*.db
+deploy/*.db-*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+server/*.db.bak-*
+*.bak

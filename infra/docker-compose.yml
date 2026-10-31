@@ -1,0 +1,103 @@
+version: "3.9"
+
+# 依据《开源选型结论》第五节「最低落地成本路线」编排：
+#   Orthanc（轻量 PACS）→ OHIF/Cornerstone3D（Web 阅片）→ AI 推理 → dicom-pdf 报告
+#
+# 本 compose 只负责「基础设施 + 可选外部依赖」。业务服务（server/）与
+# 前端（web/）默认在本机开发环境运行，Docker 仅用于拉起 PACS 与 AI 推理。
+#
+# 启动：
+#   docker compose -f infra/docker-compose.yml up -d orthanc postgres
+#   # 可选：AI 推理（需要 NVIDIA Container Toolkit）
+#   docker compose -f infra/docker-compose.yml --profile ai up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: miis-postgres
+    environment:
+      POSTGRES_DB: miis
+      POSTGRES_USER: miis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-miis_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 轻量 DICOM PACS + DICOMweb 服务端（契约 §2.1 的对端）
+  orthanc:
+    image: jodogne/orthanc:1.12.9
+    container_name: miis-orthanc
+    command: ["/usr/sbin/Orthanc", "/etc/orthanc/orthanc.json"]
+    environment:
+      ORTHANC_SECRET: ${ORTHANC_SECRET:-change-me-in-prod}
+      ORTHANC_NAME: MIIS-Orthanc
+    ports:
+      - "8042:8042"     # DICOMweb / REST
+      - "4242:4242"     # DICOM C-STORE / C-FIND
+    volumes:
+      - ./orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
+      - orthanc-data:/var/lib/orthanc/db
+      - orthanc-storage:/var/lib/orthanc/storage
+    depends_on:
+      - postgres
+
+  # AI 推理容器（契约 §2.4）。需要 NVIDIA Container Toolkit。
+  ai-inference:
+    profiles: ["ai"]
+    image: monai/super:latest
+    container_name: miis-ai
+    environment:
+      MONAI_SAVE_PATH: /output
+    ports:
+      - "8001:8000"
+    volumes:
+      - ai-data:/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # 前端与后端在生产环境下的部署目标（本地开发不需要）
+  server:
+    profiles: ["app"]
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    container_name: miis-server
+    environment:
+      DATABASE_URL: postgresql+psycopg://miis:${POSTGRES_PASSWORD:-miis_dev}@postgres:5432/miis
+      DICOMWEB_BASE_URL: http://orthanc:8042/dicomweb
+      AI_BASE_URL: ""
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    profiles: ["app"]
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: /api/v1
+    container_name: miis-web
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+volumes:
+  pgdata:
+  orthanc-data:
+  orthanc-storage:
+  ai-data:
